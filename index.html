@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nómina Semanal - Autoservicio Castillo</title>
+<meta name="theme-color" content="#0a0f25">
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --fondo: #0a0f25; --tarjeta: #11183b; --tarjeta2: #18214d;
+    --oro: #d9b85c; --oro-osc: #b89a45; --texto: #f0f0f0; --suave: #a9adc4;
+    --verde: #4caf50; --rojo: #e57373; --borde: #2a356b;
+  }
+  body {
+    margin: 0; padding: 16px; min-height: 100dvh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--fondo); color: var(--texto);
+  }
+  .app { max-width: 760px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 14px; }
+  h1 { font-family: "Times New Roman", Times, serif; font-weight: normal; color: var(--oro);
+       font-size: 30px; margin: 6px 0 2px; letter-spacing: 1px; }
+  .sub { color: var(--suave); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+
+  .tabs { display: flex; gap: 6px; margin: 14px 0; }
+  .tabs button { flex: 1; padding: 12px 6px; border-radius: 10px; border: 1px solid var(--borde);
+    background: var(--tarjeta); color: var(--suave); font-size: 15px; cursor: pointer; }
+  .tabs button.activo { background: var(--oro); color: #0a0f25; border-color: var(--oro); font-weight: bold; }
+
+  .card { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 14px;
+          padding: 16px; margin-bottom: 14px; }
+  .card.oro { border: 2px solid var(--oro); }
+  h2 { font-size: 17px; color: var(--oro); margin: 0 0 12px; font-weight: 600; }
+
+  .semana-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .semana-nav .rango { text-align: center; font-size: 16px; font-weight: 600; }
+  .semana-nav .rango small { display: block; color: var(--suave); font-weight: normal; font-size: 12px; margin-top: 2px; }
+  .btn-nav { width: 46px; height: 46px; border-radius: 10px; border: 1px solid var(--oro);
+    background: transparent; color: var(--oro); font-size: 22px; cursor: pointer; flex: none; }
+
+  .dia { border: 1px solid var(--borde); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: var(--tarjeta2); }
+  .dia.hoy { border-color: var(--oro); }
+  .dia-cab { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .dia-nombre { font-weight: 600; font-size: 16px; }
+  .dia-nombre small { color: var(--suave); font-weight: normal; font-size: 13px; margin-left: 6px; }
+  .dia-valor { color: var(--oro); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .opciones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .opcion { border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto);
+    border-radius: 9px; padding: 8px 4px; cursor: pointer; text-align: center; font-size: 13px; line-height: 1.25; }
+  .opcion b { display: block; font-size: 14px; }
+  .opcion span { color: var(--suave); font-size: 11px; }
+  .opcion.sel { background: var(--oro); border-color: var(--oro); color: #0a0f25; }
+  .opcion.sel span { color: #2b2510; }
+  .opcion.sel.nada { background: #3a4270; border-color: #5a63a0; color: var(--texto); }
+  .opcion.sel.nada span { color: var(--suave); }
+
+  .fila { display: flex; justify-content: space-between; padding: 6px 0; font-variant-numeric: tabular-nums; }
+  .fila.total { border-top: 1px solid var(--borde); margin-top: 6px; padding-top: 10px; font-size: 19px; font-weight: bold; color: var(--oro); }
+  .campo { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .campo label { font-size: 13px; color: var(--suave); }
+  input[type=text], input[type=number], input[type=month], textarea {
+    width: 100%; padding: 10px; border-radius: 9px; border: 1px solid var(--borde);
+    background: var(--fondo); color: var(--texto); font-size: 16px; font-family: inherit; }
+  input:focus, textarea:focus { outline: 2px solid var(--oro); border-color: var(--oro); }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .btn { padding: 12px 14px; border-radius: 10px; border: none; cursor: pointer; font-size: 15px; font-weight: 600; }
+  .btn-oro { background: var(--oro); color: #0a0f25; }
+  .btn-oro:hover { background: var(--oro-osc); }
+  .btn-linea { background: transparent; color: var(--oro); border: 1px solid var(--oro); }
+  .btn-rojo { background: transparent; color: var(--rojo); border: 1px solid var(--rojo); }
+  .acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .acciones .btn { flex: 1 1 140px; }
+
+  .estado { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .estado.pagada { background: rgba(76,175,80,.18); color: #8fd694; }
+  .estado.pendiente { background: rgba(229,115,115,.15); color: #f0a0a0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 6px; border-bottom: 1px solid var(--borde); text-align: left; }
+  th { color: var(--suave); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  td.num, th.num { text-align: right; }
+  tr.click { cursor: pointer; }
+  tr.click:hover td { background: var(--tarjeta2); }
+  .scroll { overflow-x: auto; }
+  .vacio { color: var(--suave); text-align: center; padding: 18px 0; }
+  .nota { color: var(--suave); font-size: 12px; margin-top: 8px; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--oro);
+    color: #0a0f25; padding: 10px 18px; border-radius: 10px; font-weight: 600; opacity: 0; transition: opacity .25s; pointer-events: none; }
+  .toast.ver { opacity: 1; }
+  .oculto { display: none !important; }
+  .solo-imprimir { display: none; }
+  a.volver { color: var(--suave); font-size: 13px; text-decoration: none; }
+
+  @media (max-width: 520px) {
+    .opciones { grid-template-columns: repeat(2, 1fr); }
+    h1 { font-size: 26px; }
+  }
+
+  @media print {
+    body { background: #fff; color: #000; padding: 0; }
+    .no-imprimir, .tabs, header a { display: none !important; }
+    .vista:not(#vista-mes) { display: none !important; }
+    #vista-mes { display: block !important; }
+    .solo-imprimir { display: block; }
+    .card { background: #fff; border: 1px solid #999; break-inside: avoid; }
+    h1, h2, .fila.total, .dia-valor { color: #000; }
+    th, td { border-color: #bbb; color: #000; }
+    .estado.pagada, .estado.pendiente { background: none; color: #000; border: 1px solid #777; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Nómina Semanal</h1>
+    <div class="sub" id="sub-empleado">Autoservicio Castillo</div>
+  </header>
+
+  <nav class="tabs no-imprimir">
+    <button data-vista="semana" class="activo">Semana</button>
+    <button data-vista="historial">Historial</button>
+    <button data-vista="mes">Mensual</button>
+    <button data-vista="ajustes">Ajustes</button>
+  </nav>
+
+  <!-- ============ SEMANA ============ -->
+  <section class="vista" id="vista-semana">
+    <div class="card oro">
+      <div class="semana-nav">
+        <button class="btn-nav" id="sem-ant" aria-label="Semana anterior">‹</button>
+        <div class="rango"><span id="sem-rango"></span><small id="sem-estado"></small></div>
+        <button class="btn-nav" id="sem-sig" aria-label="Semana siguiente">›</button>
+      </div>
+    </div>
+
+    <div id="lista-dias"></div>
+
+    <div class="card">
+      <h2>Resumen de la semana</h2>
+      <div id="resumen-semana"></div>
+      <div class="dos" style="margin-top:12px">
+        <div class="campo">
+          <label for="sem-adelanto">Adelantos / descuentos ($)</label>
+          <input type="number" id="sem-adelanto" min="0" step="1000" inputmode="numeric" placeholder="0">
+        </div>
+        <div class="campo">
+          <label for="sem-nota">Nota</label>
+          <input type="text" id="sem-nota" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="fila total"><span>Total a pagar</span><span id="sem-total">$0</span></div>
+      <div class="acciones">
+        <button class="btn btn-oro" id="btn-pagar">Marcar semana como pagada</button>
+        <button class="btn btn-linea" id="btn-hoy">Ir a esta semana</button>
+      </div>
+      <p class="nota">Todo se guarda automáticamente en este dispositivo al marcar cada día.</p>
+    </div>
+  </section>
+
+  <!-- ============ HISTORIAL ============ -->
+  <section class="vista oculto" id="vista-historial">
+    <div class="card">
+      <h2>Historial de semanas</h2>
+      <div id="tabla-historial"></div>
+      <p class="nota">Toca una semana para abrirla y editarla.</p>
+    </div>
+  </section>
+
+  <!-- ============ MENSUAL ============ -->
+  <section class="vista oculto" id="vista-mes">
+    <div class="card no-imprimir">
+      <div class="campo">
+        <label for="mes-sel">Mes del reporte</label>
+        <input type="month" id="mes-sel">
+      </div>
+      <div class="acciones">
+        <button class="btn btn-oro" id="btn-imprimir">Imprimir / Guardar PDF</button>
+        <button class="btn btn-linea" id="btn-csv">Descargar Excel (CSV)</button>
+      </div>
+      <p class="nota">Cada semana se cuenta en el mes en que termina (domingo), que es cuando se paga.</p>
+    </div>
+    <div id="reporte-mes"></div>
+  </section>
+
+  <!-- ============ AJUSTES ============ -->
+  <section class="vista oculto" id="vista-ajustes">
+    <div class="card">
+      <h2>Empleado y tarifas</h2>
+      <div class="campo"><label for="cfg-empleado">Nombre del empleado</label>
+        <input type="text" id="cfg-empleado" placeholder="Nombre"></div>
+      <div class="campo"><label for="cfg-normal">Normal: 7:30–12:00 y 2:00–6:00 pm ($ por día)</label>
+        <input type="number" id="cfg-normal" step="1000" inputmode="numeric"></div>
+      <div class="campo"><label for="cfg-largo">Con almuerzo hasta las 9: 7:30–12:00 y 2:00–9:00 pm ($ por día)</label>
+        <input type="number" id="cfg-largo" step="1000" inputmode="numeric"></div>
+      <div class="campo"><label for="cfg-corrido">Corrido: 7:30 am–9:00 pm sin salir ($ por día)</label>
+        <input type="number" id="cfg-corrido" step="1000" inputmode="numeric"></div>
+      <div class="acciones"><button class="btn btn-oro" id="btn-guardar-cfg">Guardar ajustes</button></div>
+      <p class="nota">Cambiar una tarifa solo afecta los días que marques de ahora en adelante; los días ya guardados conservan su valor.</p>
+    </div>
+    <div class="card">
+      <h2>Copia de seguridad</h2>
+      <p class="nota" style="margin-top:0">Los datos viven en este navegador. Descarga una copia de vez en cuando para no perder el historial si cambias de celular o borras el navegador.</p>
+      <div class="acciones">
+        <button class="btn btn-linea" id="btn-exportar">Descargar copia</button>
+        <button class="btn btn-linea" id="btn-importar">Restaurar copia</button>
+        <input type="file" id="archivo-importar" accept=".json,application/json" class="oculto">
+      </div>
+      <div class="acciones"><button class="btn btn-rojo" id="btn-borrar">Borrar todo</button></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const CLAVE = 'nomina_castillo_v1';
+  const DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  // Horas de cada jornada (para mostrar)
+  const TIPOS = {
+    normal:  { nombre: 'Normal',  horario: '7:30–12 · 2–6 pm', horas: 8.5 },
+    largo:   { nombre: 'Hasta 9 pm', horario: '7:30–12 · 2–9 pm', horas: 11.5 },
+    corrido: { nombre: 'Corrido', horario: '7:30 am–9 pm', horas: 13.5 },
+  };
+  const ORDEN = ['normal','largo','corrido'];
+
+  // ---------- Datos ----------
+  const porDefecto = () => ({
+    config: { empleado: '', tarifas: { normal: 60000, largo: 70000, corrido: 80000 } },
+    dias: {},      // "YYYY-MM-DD": { tipo, valor }
+    semanas: {},   // lunes "YYYY-MM-DD": { pagada, fechaPago, adelanto, nota }
+  });
+  let datos;
+  try { datos = JSON.parse(localStorage.getItem(CLAVE)) || porDefecto(); } catch { datos = porDefecto(); }
+  datos.config ??= porDefecto().config; datos.dias ??= {}; datos.semanas ??= {};
+  const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(datos)); } catch { aviso('No se pudo guardar'); } };
+
+  // ---------- Fechas ----------
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const deIso = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+  const sumarDias = (d, n) => { const r = new Date(d); r.setDate(r.getDate()+n); return r; };
+  const lunesDe = d => { const r = new Date(d.getFullYear(), d.getMonth(), d.getDate()); const w = (r.getDay()+6)%7; return sumarDias(r, -w); };
+  const corta = d => `${d.getDate()} ${MESES[d.getMonth()].slice(0,3)}`;
+  const rangoTxt = lunes => { const dom = sumarDias(lunes, 6); return `${corta(lunes)} – ${corta(dom)} ${dom.getFullYear()}`; };
+  const rangoCorto = lunes => { const dom = sumarDias(lunes, 6);
+    return lunes.getMonth() === dom.getMonth() ? `${lunes.getDate()}–${corta(dom)}` : `${corta(lunes)} – ${corta(dom)}`; };
+  const pesos = n => '$' + Math.round(n || 0).toLocaleString('es-CO');
+
+  // ---------- Cálculos ----------
+  function calcularSemana(lunesIso) {
+    const lunes = deIso(lunesIso);
+    const r = { conteo: { normal:0, largo:0, corrido:0 }, valor: { normal:0, largo:0, corrido:0 }, horas: 0, bruto: 0, dias: 0 };
+    for (let i = 0; i < 7; i++) {
+      const reg = datos.dias[iso(sumarDias(lunes, i))];
+      if (!reg || !TIPOS[reg.tipo]) continue;
+      r.conteo[reg.tipo]++; r.valor[reg.tipo] += reg.valor; r.bruto += reg.valor;
+      r.horas += TIPOS[reg.tipo].horas; r.dias++;
+    }
+    const s = datos.semanas[lunesIso] || {};
+    r.adelanto = Number(s.adelanto) || 0;
+    r.neto = r.bruto - r.adelanto;
+    r.pagada = !!s.pagada; r.fechaPago = s.fechaPago; r.nota = s.nota || '';
+    return r;
+  }
+  function semanasConDatos() {
+    const set = new Set();
+    for (const f of Object.keys(datos.dias)) set.add(iso(lunesDe(deIso(f))));
+    for (const [l, s] of Object.entries(datos.semanas)) if (s.pagada || s.adelanto || s.nota) set.add(l);
+    return [...set].sort().reverse();
+  }
+
+  // ---------- UI: navegación ----------
+  const $ = id => document.getElementById(id);
+  let lunesActual = lunesDe(new Date());
+
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => mostrarVista(b.dataset.vista)));
+  function mostrarVista(v) {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('activo', b.dataset.vista === v));
+    document.querySelectorAll('.vista').forEach(s => s.classList.toggle('oculto', s.id !== 'vista-' + v));
+    if (v === 'semana') pintarSemana();
+    if (v === 'historial') pintarHistorial();
+    if (v === 'mes') pintarMes();
+    if (v === 'ajustes') pintarAjustes();
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- UI: semana ----------
+  function pintarSemana() {
+    const lunesIso = iso(lunesActual);
+    const hoy = iso(new Date());
+    $('sem-rango').textContent = rangoTxt(lunesActual);
+    const t = datos.config.tarifas;
+    let html = '';
+    for (let i = 0; i < 7; i++) {
+      const d = sumarDias(lunesActual, i), f = iso(d), reg = datos.dias[f];
+      const sel = reg?.tipo || 'nada';
+      html += `<div class="dia ${f === hoy ? 'hoy' : ''}">
+        <div class="dia-cab"><div class="dia-nombre">${DIAS[i]}<small>${corta(d)}${f === hoy ? ' · hoy' : ''}</small></div>
+        <div class="dia-valor">${reg ? pesos(reg.valor) : '—'}</div></div>
+        <div class="opciones">
+          <button class="opcion nada ${sel==='nada'?'sel':''}" data-f="${f}" data-t="nada"><b>No trabajó</b><span>$0</span></button>
+          ${ORDEN.map(k => `<button class="opcion ${sel===k?'sel':''}" data-f="${f}" data-t="${k}">
+            <b>${TIPOS[k].nombre}</b><span>${TIPOS[k].horario}<br>${pesos(reg?.tipo===k ? reg.valor : t[k])}</span></button>`).join('')}
+        </div></div>`;
+    }
+    $('lista-dias').innerHTML = html;
+    const r = calcularSemana(lunesIso);
+    $('resumen-semana').innerHTML =
+      ORDEN.map(k => `<div class="fila"><span>${TIPOS[k].nombre} × ${r.conteo[k]}</span><span>${pesos(r.valor[k])}</span></div>`).join('') +
+      `<div class="fila"><span>Días trabajados · horas</span><span>${r.dias} días · ${r.horas.toLocaleString('es-CO')} h</span></div>
+       <div class="fila"><span>Subtotal</span><span>${pesos(r.bruto)}</span></div>`;
+    $('sem-adelanto').value = r.adelanto || '';
+    $('sem-nota').value = r.nota;
+    $('sem-total').textContent = pesos(r.neto);
+    $('sem-estado').innerHTML = r.pagada
+      ? `<span class="estado pagada">Pagada${r.fechaPago ? ' el ' + corta(deIso(r.fechaPago)) : ''}</span>`
+      : `<span class="estado pendiente">Pendiente de pago</span>`;
+    $('btn-pagar').textContent = r.pagada ? 'Desmarcar pago' : 'Marcar semana como pagada';
+    $('btn-pagar').className = 'btn ' + (r.pagada ? 'btn-linea' : 'btn-oro');
+  }
+
+  $('lista-dias').addEventListener('click', e => {
+    const b = e.target.closest('.opcion'); if (!b) return;
+    const { f, t } = b.dataset;
+    if (t === 'nada') delete datos.dias[f];
+    else datos.dias[f] = { tipo: t, valor: datos.config.tarifas[t] };
+    guardar(); pintarSemana();
+  });
+  const semanaReg = () => (datos.semanas[iso(lunesActual)] ??= {});
+  $('sem-adelanto').addEventListener('input', e => { semanaReg().adelanto = Number(e.target.value) || 0; guardar();
+    $('sem-total').textContent = pesos(calcularSemana(iso(lunesActual)).neto); });
+  $('sem-nota').addEventListener('input', e => { semanaReg().nota = e.target.value; guardar(); });
+  $('btn-pagar').addEventListener('click', () => {
+    const s = semanaReg(); s.pagada = !s.pagada; s.fechaPago = s.pagada ? iso(new Date()) : null;
+    guardar(); pintarSemana(); aviso(s.pagada ? 'Semana marcada como pagada' : 'Pago desmarcado');
+  });
+  $('sem-ant').addEventListener('click', () => { lunesActual = sumarDias(lunesActual, -7); pintarSemana(); });
+  $('sem-sig').addEventListener('click', () => { lunesActual = sumarDias(lunesActual, 7); pintarSemana(); });
+  $('btn-hoy').addEventListener('click', () => { lunesActual = lunesDe(new Date()); pintarSemana(); });
+
+  // ---------- UI: historial ----------
+  function pintarHistorial() {
+    const lista = semanasConDatos();
+    if (!lista.length) { $('tabla-historial').innerHTML = '<div class="vacio">Aún no hay semanas registradas.</div>'; return; }
+    $('tabla-historial').innerHTML = `<table><thead><tr><th>Semana</th><th class="num">Días</th><th class="num">A pagar</th><th>Estado</th></tr></thead><tbody>` +
+      lista.map(l => { const r = calcularSemana(l);
+        return `<tr class="click" data-l="${l}"><td>${rangoTxt(deIso(l))}</td><td class="num">${r.dias}</td>
+          <td class="num">${pesos(r.neto)}</td><td><span class="estado ${r.pagada?'pagada':'pendiente'}">${r.pagada?'Pagada':'Pendiente'}</span></td></tr>`;
+      }).join('') + '</tbody></table>';
+  }
+  $('tabla-historial').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-l]'); if (!tr) return;
+    lunesActual = deIso(tr.dataset.l); mostrarVista('semana');
+  });
+
+  // ---------- UI: mensual ----------
+  const hoyMes = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+  $('mes-sel').value = hoyMes();
+  $('mes-sel').addEventListener('change', pintarMes);
+
+  function semanasDelMes(ym) {
+    const [y, m] = ym.split('-').map(Number);
+    return semanasConDatos().filter(l => { const dom = sumarDias(deIso(l), 6); return dom.getFullYear() === y && dom.getMonth()+1 === m; }).sort();
+  }
+  function pintarMes() {
+    const ym = $('mes-sel').value || hoyMes();
+    const [y, m] = ym.split('-').map(Number);
+    const semanas = semanasDelMes(ym);
+    const tot = { conteo: { normal:0, largo:0, corrido:0 }, valor: { normal:0, largo:0, corrido:0 }, dias:0, horas:0, bruto:0, adelanto:0, neto:0, pagado:0 };
+    const filas = semanas.map(l => { const r = calcularSemana(l);
+      ORDEN.forEach(k => { tot.conteo[k] += r.conteo[k]; tot.valor[k] += r.valor[k]; });
+      tot.dias += r.dias; tot.horas += r.horas; tot.bruto += r.bruto; tot.adelanto += r.adelanto; tot.neto += r.neto;
+      if (r.pagada) tot.pagado += r.neto;
+      return { l, r };
+    });
+    const titulo = `${MESES[m-1][0].toUpperCase() + MESES[m-1].slice(1)} ${y}`;
+    const emp = datos.config.empleado || 'Empleado';
+    if (!filas.length) { $('reporte-mes').innerHTML = `<div class="card"><h2>${titulo}</h2><div class="vacio">No hay semanas registradas que terminen en este mes.</div></div>`; return; }
+    $('reporte-mes').innerHTML = `
+      <div class="card oro">
+        <h2>Reporte mensual · ${titulo}</h2>
+        <div class="fila"><span>Empleado</span><span>${esc(emp)}</span></div>
+        ${ORDEN.map(k => `<div class="fila"><span>${TIPOS[k].nombre} (${TIPOS[k].horario}) × ${tot.conteo[k]}</span><span>${pesos(tot.valor[k])}</span></div>`).join('')}
+        <div class="fila"><span>Días trabajados · horas</span><span>${tot.dias} días · ${tot.horas.toLocaleString('es-CO')} h</span></div>
+        <div class="fila"><span>Subtotal</span><span>${pesos(tot.bruto)}</span></div>
+        <div class="fila"><span>Adelantos / descuentos</span><span>−${pesos(tot.adelanto)}</span></div>
+        <div class="fila total"><span>Total del mes</span><span>${pesos(tot.neto)}</span></div>
+        <div class="fila"><span>Ya pagado</span><span>${pesos(tot.pagado)}</span></div>
+        <div class="fila"><span>Pendiente por pagar</span><span>${pesos(tot.neto - tot.pagado)}</span></div>
+      </div>
+      <div class="card">
+        <h2>Semanas del mes</h2>
+        <div class="scroll"><table><thead><tr><th>Semana</th><th class="num">N</th><th class="num">9pm</th><th class="num">C</th><th class="num">Desc.</th><th class="num">Total</th></tr></thead><tbody>
+        ${filas.map(({l, r}) => `<tr><td style="white-space:nowrap">${rangoCorto(deIso(l))}<br><span class="estado ${r.pagada?'pagada':'pendiente'}">${r.pagada?'Pagada':'Pendiente'}</span>${r.nota ? `<br><small style="color:var(--suave)">${esc(r.nota)}</small>` : ''}</td>
+          <td class="num">${r.conteo.normal}</td><td class="num">${r.conteo.largo}</td><td class="num">${r.conteo.corrido}</td>
+          <td class="num">${r.adelanto ? pesos(r.adelanto) : '—'}</td><td class="num">${pesos(r.neto)}</td></tr>`).join('')}
+        </tbody></table></div>
+        <p class="nota">N = Normal · 9pm = con almuerzo hasta las 9 · C = Corrido</p>
+      </div>
+      <div class="card">
+        <h2>Detalle por día</h2>
+        <table><thead><tr><th>Fecha</th><th>Jornada</th><th class="num">Valor</th></tr></thead><tbody>
+        ${filas.flatMap(({l}) => [...Array(7)].map((_, i) => { const d = sumarDias(deIso(l), i), reg = datos.dias[iso(d)];
+            return reg ? `<tr><td>${DIAS[i].slice(0,3)} ${corta(d)}</td><td>${TIPOS[reg.tipo].nombre} · ${TIPOS[reg.tipo].horario}</td><td class="num">${pesos(reg.valor)}</td></tr>` : ''; })).join('')}
+        </tbody></table>
+        <p class="solo-imprimir" style="margin-top:40px">Firma del empleado: ______________________________</p>
+      </div>`;
+  }
+  $('btn-imprimir').addEventListener('click', () => { pintarMes(); window.print(); });
+  $('btn-csv').addEventListener('click', () => {
+    const ym = $('mes-sel').value || hoyMes();
+    const filas = [['Fecha','Día','Jornada','Horario','Horas','Valor','Semana','Estado semana']];
+    for (const l of semanasDelMes(ym)) { const r = calcularSemana(l);
+      for (let i = 0; i < 7; i++) { const d = sumarDias(deIso(l), i), reg = datos.dias[iso(d)]; if (!reg) continue;
+        const t = TIPOS[reg.tipo];
+        filas.push([iso(d), DIAS[i], t.nombre, t.horario, String(t.horas).replace('.', ','), reg.valor, rangoTxt(deIso(l)), r.pagada ? 'Pagada' : 'Pendiente']); }
+      if (r.adelanto) filas.push(['', '', 'Adelanto/descuento', '', '', -r.adelanto, rangoTxt(deIso(l)), r.pagada ? 'Pagada' : 'Pendiente']);
+    }
+    const csv = '﻿' + filas.map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    descargar(csv, `nomina-${ym}.csv`, 'text/csv;charset=utf-8');
+  });
+
+  // ---------- UI: ajustes ----------
+  function pintarAjustes() {
+    $('cfg-empleado').value = datos.config.empleado || '';
+    ORDEN.forEach(k => $('cfg-' + k).value = datos.config.tarifas[k]);
+  }
+  $('btn-guardar-cfg').addEventListener('click', () => {
+    datos.config.empleado = $('cfg-empleado').value.trim();
+    for (const k of ORDEN) { const v = Number($('cfg-' + k).value); if (v > 0) datos.config.tarifas[k] = v; }
+    guardar(); pintarEncabezado(); aviso('Ajustes guardados');
+  });
+  $('btn-exportar').addEventListener('click', () =>
+    descargar(JSON.stringify(datos, null, 2), `nomina-copia-${iso(new Date())}.json`, 'application/json'));
+  $('btn-importar').addEventListener('click', () => $('archivo-importar').click());
+  $('archivo-importar').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { const d = JSON.parse(await f.text());
+      if (!d || typeof d.dias !== 'object') throw 0;
+      if (!confirm('¿Reemplazar los datos actuales con esta copia?')) return;
+      datos = { ...porDefecto(), ...d }; guardar(); pintarEncabezado(); pintarAjustes(); aviso('Copia restaurada');
+    } catch { alert('El archivo no es una copia válida de la nómina.'); }
+    e.target.value = '';
+  });
+  $('btn-borrar').addEventListener('click', () => {
+    if (!confirm('¿Borrar TODO el historial de nómina? Esta acción no se puede deshacer.')) return;
+    if (!confirm('Confirma de nuevo: se borrarán todas las semanas.')) return;
+    const cfg = datos.config; datos = porDefecto(); datos.config = cfg; guardar(); aviso('Historial borrado');
+  });
+
+  // ---------- Utilidades ----------
+  function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function descargar(contenido, nombre, tipo) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+    a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  let tToast;
+  function aviso(txt) { const t = $('toast'); t.textContent = txt; t.classList.add('ver'); clearTimeout(tToast); tToast = setTimeout(() => t.classList.remove('ver'), 1800); }
+  function pintarEncabezado() { $('sub-empleado').textContent = datos.config.empleado ? `Empleado: ${datos.config.empleado}` : 'Autoservicio Castillo'; }
+
+  pintarEncabezado();
+  pintarSemana();
+})();
+</script>
+</body>
+</html>
