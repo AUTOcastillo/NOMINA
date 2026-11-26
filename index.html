@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nómina Semanal - Autoservicio Castillo</title>
 <meta name="theme-color" content="#0a0f25">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nómina">
+<link rel="apple-touch-icon" href="icono-180.png">
+<link rel="icon" type="image/png" href="icono-192.png">
 <style>
   * { box-sizing: border-box; }
   :root {
@@ -13,7 +20,8 @@
     --verde: #4caf50; --rojo: #e57373; --borde: #2a356b;
   }
   body {
-    margin: 0; padding: 16px; min-height: 100dvh;
+    margin: 0; padding: 16px; padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom)); min-height: 100dvh;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: var(--fondo); color: var(--texto);
   }
@@ -84,6 +92,14 @@
   tr.click { cursor: pointer; }
   tr.click:hover td { background: var(--tarjeta2); }
   .scroll { overflow-x: auto; }
+  .nube { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--suave); }
+  .nube .dot { width: 9px; height: 9px; border-radius: 50%; background: #777; }
+  .nube.ok .dot { background: var(--verde); box-shadow: 0 0 5px var(--verde); }
+  .nube.sync .dot { background: var(--oro); }
+  .nube.error .dot { background: var(--rojo); }
+  .alerta { border: 1px solid var(--rojo); background: rgba(229,115,115,.1); color: #f3c0c0; border-radius: 12px;
+    padding: 12px; margin-bottom: 14px; font-size: 14px; }
+  .alerta a { color: var(--oro); }
   .empleados { display: flex; gap: 6px; margin: -4px 0 14px; }
   .empleados button { flex: 1; min-width: 0; padding: 10px 6px; border-radius: 22px; border: 1px solid var(--oro);
     background: transparent; color: var(--oro); font-size: 14px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -120,6 +136,7 @@
   <header>
     <h1>Nómina Semanal</h1>
     <div class="sub" id="sub-empleado">Autoservicio Castillo</div>
+    <div class="nube no-imprimir" id="estado-nube"><span class="dot"></span><span id="estado-nube-txt">Solo en este dispositivo</span></div>
   </header>
 
   <nav class="tabs no-imprimir">
@@ -129,6 +146,8 @@
     <button data-vista="ajustes">Ajustes</button>
   </nav>
   <div class="empleados no-imprimir" id="sel-empleados"></div>
+  <div class="alerta no-imprimir oculto" id="alerta-local">Los datos están guardados solo en este dispositivo y se pueden perder.
+    <a href="#" id="ir-ajustes">Conecta la base de datos de Google</a> para guardarlos en la nube.</div>
 
   <!-- ============ SEMANA ============ -->
   <section class="vista" id="vista-semana">
@@ -204,9 +223,23 @@
       <div class="acciones"><button class="btn btn-oro" id="btn-guardar-cfg">Guardar ajustes</button></div>
       <p class="nota">Estos ajustes son solo del empleado seleccionado arriba. Cambiar una tarifa solo afecta los días que marques de ahora en adelante; los días ya guardados conservan su valor.</p>
     </div>
+    <div class="card oro">
+      <h2>Base de datos (Hoja de Google)</h2>
+      <p class="nota" style="margin-top:0">Con la base de datos conectada, cada cambio se guarda en tu hoja de Google y no se pierde aunque se borre el navegador o cambies de celular. Ver la guía <b>CONFIGURAR-BASE-DE-DATOS.md</b>.</p>
+      <div class="campo"><label for="db-url">Enlace de la aplicación web (termina en /exec)</label>
+        <input type="text" id="db-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="campo"><label for="db-clave">Clave</label>
+        <input type="text" id="db-clave" placeholder="La misma clave del script" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="acciones">
+        <button class="btn btn-oro" id="btn-conectar">Conectar y cargar datos</button>
+        <button class="btn btn-linea" id="btn-desconectar">Desconectar</button>
+      </div>
+      <div class="acciones"><button class="btn btn-linea" id="btn-subir-todo">Subir todo lo de este dispositivo a la hoja</button></div>
+      <p class="nota" id="db-estado"></p>
+    </div>
     <div class="card">
       <h2>Copia de seguridad</h2>
-      <p class="nota" style="margin-top:0">Los datos viven en este navegador. Descarga una copia de vez en cuando para no perder el historial si cambias de celular o borras el navegador.</p>
+      <p class="nota" style="margin-top:0">Con la base de datos conectada no hace falta, pero puedes descargar una copia extra (archivo) cuando quieras.</p>
       <div class="acciones">
         <button class="btn btn-linea" id="btn-exportar">Descargar copia</button>
         <button class="btn btn-linea" id="btn-importar">Restaurar copia</button>
@@ -259,6 +292,97 @@
   const nombreEmp = i => almacen.empleados[i].config.empleado || `Empleado ${i + 1}`;
   const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(almacen)); } catch { aviso('No se pudo guardar'); } };
 
+  // ---------- Base de datos en la nube (Hoja de Google + Apps Script) ----------
+  // Si quieres que el enlace quede fijo (y solo tengas que escribir la clave), pégalo aquí:
+  const URL_BASE_DATOS = '';
+  const CLAVE_CONEXION = 'nomina_conexion', CLAVE_PENDIENTES = 'nomina_pendientes';
+  const leerLS = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } };
+  const escribirLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  let conexion = leerLS(CLAVE_CONEXION, {});
+  if (!conexion.url && URL_BASE_DATOS) conexion.url = URL_BASE_DATOS;
+  let pendientes = leerLS(CLAVE_PENDIENTES, []);
+  let enviando = false, tEnvio = null, tReintento = null, secuencia = Date.now();
+  const conectado = () => !!(conexion.url && conexion.clave);
+
+  async function llamar(cuerpo) {
+    const resp = await fetch(conexion.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ clave: conexion.clave, ...cuerpo }) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const r = await resp.json();
+    if (!r.ok) throw new Error(r.error || 'Error de la base de datos');
+    return r;
+  }
+  const claveCambio = c => c.t === 'todo' ? 'todo' : `${c.t}|${c.emp}|${c.fecha || c.lunes || ''}`;
+  function registrar(c) {
+    if (!conectado()) return;
+    c.n = ++secuencia;
+    if (c.t === 'todo') pendientes = [];
+    pendientes = pendientes.filter(p => claveCambio(p) !== claveCambio(c));
+    pendientes.push(c); escribirLS(CLAVE_PENDIENTES, pendientes);
+    estadoNube();
+    clearTimeout(tEnvio); tEnvio = setTimeout(enviar, 700);
+  }
+  async function enviar() {
+    if (enviando || !pendientes.length || !conectado()) return estadoNube();
+    enviando = true; estadoNube();
+    const lote = pendientes.slice();
+    try {
+      await llamar({ accion: 'guardar', cambios: lote.map(({ n, ...c }) => c) });
+      const enviados = new Map(lote.map(c => [claveCambio(c), c.n]));
+      pendientes = pendientes.filter(p => !(enviados.has(claveCambio(p)) && p.n <= enviados.get(claveCambio(p))));
+      escribirLS(CLAVE_PENDIENTES, pendientes);
+      conexion.error = ''; conexion.ultima = new Date().toISOString();
+    } catch (err) {
+      conexion.error = err.message || 'Sin conexión';
+      clearTimeout(tReintento); tReintento = setTimeout(enviar, 15000);
+    } finally {
+      enviando = false; escribirLS(CLAVE_CONEXION, conexion); estadoNube();
+      if (pendientes.length && !conexion.error) enviar();
+    }
+  }
+  const tieneDatos = st => st.empleados.some(e => Object.keys(e.dias).length || Object.keys(e.semanas).length || e.config.empleado);
+  async function cargarDeNube({ mostrarAviso = false } = {}) {
+    if (!conectado()) return estadoNube();
+    if (pendientes.length) { await enviar(); if (pendientes.length) return; }   // primero sube lo pendiente
+    try {
+      $('estado-nube').className = 'nube sync no-imprimir'; $('estado-nube-txt').textContent = 'Cargando…';
+      const r = await llamar({ accion: 'leer' });
+      if (r.vacia) {
+        if (tieneDatos(almacen)) { registrar({ t: 'todo', empleados: almacen.empleados }); if (mostrarAviso) aviso('Subiendo tus datos a la hoja'); }
+        else if (mostrarAviso) aviso('Conectado: la hoja está vacía');
+      } else {
+        almacen = normalizar({ version: 2, activo: almacen.activo, empleados: r.empleados });
+        datos = almacen.empleados[almacen.activo]; guardar();
+        const enfocado = document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+        pintarEncabezado(); if (!enfocado) mostrarVista(vistaActual, false);
+        if (mostrarAviso) aviso('Datos cargados de la hoja');
+      }
+      conexion.error = ''; conexion.ultima = new Date().toISOString();
+    } catch (err) {
+      conexion.error = err.message || 'Sin conexión';
+      if (mostrarAviso) alert('No se pudo conectar: ' + conexion.error);
+    }
+    escribirLS(CLAVE_CONEXION, conexion); estadoNube();
+  }
+  function estadoNube() {
+    const el = $('estado-nube'), txt = $('estado-nube-txt'); if (!el) return;
+    $('alerta-local').classList.toggle('oculto', conectado());
+    let clase = '', t = 'Solo en este dispositivo';
+    if (conectado()) {
+      if (enviando) { clase = 'sync'; t = 'Guardando en la hoja…'; }
+      else if (conexion.error) { clase = 'error'; t = `Sin conexión · ${pendientes.length} cambio(s) por subir`; }
+      else if (pendientes.length) { clase = 'sync'; t = `${pendientes.length} cambio(s) por subir`; }
+      else { clase = 'ok'; t = 'Guardado en la hoja de Google'; }
+    }
+    el.className = `nube ${clase} no-imprimir`; txt.textContent = t;
+    const db = $('db-estado');
+    if (db) db.textContent = conectado()
+      ? (conexion.error ? `Último error: ${conexion.error}` : `Conectado. Última sincronización: ${conexion.ultima ? new Date(conexion.ultima).toLocaleString('es-CO') : '—'}`)
+      : 'No conectado: los datos solo están en este dispositivo.';
+  }
+  window.addEventListener('online', () => { enviar(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') cargarDeNube(); });
+
   // ---------- Fechas ----------
   const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const deIso = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
@@ -299,7 +423,7 @@
 
   document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => mostrarVista(b.dataset.vista)));
   let vistaActual = 'semana';
-  function mostrarVista(v) {
+  function mostrarVista(v, subir = true) {
     vistaActual = v;
     document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('activo', b.dataset.vista === v));
     document.querySelectorAll('.vista').forEach(s => s.classList.toggle('oculto', s.id !== 'vista-' + v));
@@ -307,7 +431,7 @@
     if (v === 'historial') pintarHistorial();
     if (v === 'mes') pintarMes();
     if (v === 'ajustes') pintarAjustes();
-    window.scrollTo(0, 0);
+    if (subir) window.scrollTo(0, 0);
   }
 
   // ---------- UI: semana ----------
@@ -351,14 +475,17 @@
     if (t === 'nada') delete datos.dias[f];
     else datos.dias[f] = { tipo: t, valor: datos.config.tarifas[t] };
     guardar(); pintarSemana();
+    registrar({ t: 'dia', emp: almacen.activo, fecha: f, tipo: datos.dias[f]?.tipo || null, valor: datos.dias[f]?.valor || 0 });
   });
   const semanaReg = () => (datos.semanas[iso(lunesActual)] ??= {});
-  $('sem-adelanto').addEventListener('input', e => { semanaReg().adelanto = Number(e.target.value) || 0; guardar();
+  const registrarSemana = () => { const l = iso(lunesActual), s = datos.semanas[l] || {};
+    registrar({ t: 'semana', emp: almacen.activo, lunes: l, pagada: !!s.pagada, fechaPago: s.fechaPago || null, adelanto: Number(s.adelanto) || 0, nota: s.nota || '' }); };
+  $('sem-adelanto').addEventListener('input', e => { semanaReg().adelanto = Number(e.target.value) || 0; guardar(); registrarSemana();
     $('sem-total').textContent = pesos(calcularSemana(iso(lunesActual)).neto); });
-  $('sem-nota').addEventListener('input', e => { semanaReg().nota = e.target.value; guardar(); });
+  $('sem-nota').addEventListener('input', e => { semanaReg().nota = e.target.value; guardar(); registrarSemana(); });
   $('btn-pagar').addEventListener('click', () => {
     const s = semanaReg(); s.pagada = !s.pagada; s.fechaPago = s.pagada ? iso(new Date()) : null;
-    guardar(); pintarSemana(); aviso(s.pagada ? 'Semana marcada como pagada' : 'Pago desmarcado');
+    guardar(); pintarSemana(); registrarSemana(); aviso(s.pagada ? 'Semana marcada como pagada' : 'Pago desmarcado');
   });
   $('sem-ant').addEventListener('click', () => { lunesActual = sumarDias(lunesActual, -7); pintarSemana(); });
   $('sem-sig').addEventListener('click', () => { lunesActual = sumarDias(lunesActual, 7); pintarSemana(); });
@@ -467,6 +594,7 @@
 
   // ---------- UI: ajustes ----------
   function pintarAjustes() {
+    $('db-url').value = conexion.url || ''; $('db-clave').value = conexion.clave || ''; estadoNube();
     $('titulo-ajustes').textContent = `Ajustes de ${nombreEmp(almacen.activo)}`;
     $('cfg-empleado').value = datos.config.empleado || '';
     ORDEN.forEach(k => $('cfg-' + k).value = datos.config.tarifas[k]);
@@ -475,7 +603,25 @@
     datos.config.empleado = $('cfg-empleado').value.trim();
     for (const k of ORDEN) { const v = Number($('cfg-' + k).value); if (v > 0) datos.config.tarifas[k] = v; }
     guardar(); pintarEncabezado(); pintarAjustes(); aviso('Ajustes guardados');
+    registrar({ t: 'empleado', emp: almacen.activo, nombre: datos.config.empleado, tarifas: datos.config.tarifas });
   });
+  $('btn-conectar').addEventListener('click', async () => {
+    const url = $('db-url').value.trim(), clave = $('db-clave').value.trim();
+    if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(url)) return alert('El enlace debe ser el de la aplicación web de Google Apps Script (https://script.google.com/macros/s/…/exec).');
+    if (!clave) return alert('Escribe la clave que pusiste en el script.');
+    conexion = { url, clave }; escribirLS(CLAVE_CONEXION, conexion);
+    await cargarDeNube({ mostrarAviso: true });
+  });
+  $('btn-desconectar').addEventListener('click', () => {
+    if (!confirm('¿Desconectar la base de datos? Los datos siguen en tu hoja de Google; aquí quedarán solo en este dispositivo.')) return;
+    conexion = { url: URL_BASE_DATOS }; pendientes = []; escribirLS(CLAVE_CONEXION, conexion); escribirLS(CLAVE_PENDIENTES, pendientes); pintarAjustes();
+  });
+  $('btn-subir-todo').addEventListener('click', () => {
+    if (!conectado()) return alert('Primero conecta la base de datos.');
+    if (!confirm('Esto reemplaza lo que hay en la hoja con los datos de este dispositivo (los 3 empleados). ¿Continuar?')) return;
+    registrar({ t: 'todo', empleados: almacen.empleados }); aviso('Subiendo datos…');
+  });
+  $('ir-ajustes').addEventListener('click', e => { e.preventDefault(); mostrarVista('ajustes'); });
   $('btn-exportar').addEventListener('click', () =>
     descargar(JSON.stringify(almacen, null, 2), `nomina-copia-${iso(new Date())}.json`, 'application/json'));
   $('btn-importar').addEventListener('click', () => $('archivo-importar').click());
@@ -486,6 +632,7 @@
       if (!confirm('¿Reemplazar los datos actuales (los 3 empleados) con esta copia?')) return;
       almacen = normalizar(d); datos = almacen.empleados[almacen.activo]; guardar();
       pintarEmpleados(); pintarEncabezado(); pintarAjustes(); aviso('Copia restaurada');
+      registrar({ t: 'todo', empleados: almacen.empleados });
     } catch { alert('El archivo no es una copia válida de la nómina.'); }
     e.target.value = '';
   });
@@ -494,6 +641,7 @@
     if (!confirm(`¿Borrar TODO el historial de ${nom}? Los otros empleados no se tocan. No se puede deshacer.`)) return;
     if (!confirm(`Confirma de nuevo: se borrarán todas las semanas de ${nom}.`)) return;
     datos.dias = {}; datos.semanas = {}; guardar(); aviso('Historial borrado');
+    registrar({ t: 'borrarHistorial', emp: almacen.activo });
   });
 
   // ---------- Utilidades ----------
@@ -519,6 +667,9 @@
 
   pintarEncabezado();
   pintarSemana();
+  estadoNube();
+  cargarDeNube();
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
 </script>
 </body>
