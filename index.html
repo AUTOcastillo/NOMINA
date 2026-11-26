@@ -84,6 +84,10 @@
   tr.click { cursor: pointer; }
   tr.click:hover td { background: var(--tarjeta2); }
   .scroll { overflow-x: auto; }
+  .empleados { display: flex; gap: 6px; margin: -4px 0 14px; }
+  .empleados button { flex: 1; min-width: 0; padding: 10px 6px; border-radius: 22px; border: 1px solid var(--oro);
+    background: transparent; color: var(--oro); font-size: 14px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .empleados button.activo { background: var(--oro); color: #0a0f25; font-weight: bold; }
   .vacio { color: var(--suave); text-align: center; padding: 18px 0; }
   .nota { color: var(--suave); font-size: 12px; margin-top: 8px; }
   .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--oro);
@@ -124,6 +128,7 @@
     <button data-vista="mes">Mensual</button>
     <button data-vista="ajustes">Ajustes</button>
   </nav>
+  <div class="empleados no-imprimir" id="sel-empleados"></div>
 
   <!-- ============ SEMANA ============ -->
   <section class="vista" id="vista-semana">
@@ -187,7 +192,7 @@
   <!-- ============ AJUSTES ============ -->
   <section class="vista oculto" id="vista-ajustes">
     <div class="card">
-      <h2>Empleado y tarifas</h2>
+      <h2 id="titulo-ajustes">Empleado y tarifas</h2>
       <div class="campo"><label for="cfg-empleado">Nombre del empleado</label>
         <input type="text" id="cfg-empleado" placeholder="Nombre"></div>
       <div class="campo"><label for="cfg-normal">Normal: 7:30–12:00 y 2:00–6:00 pm ($ por día)</label>
@@ -197,7 +202,7 @@
       <div class="campo"><label for="cfg-corrido">Corrido: 7:30 am–9:00 pm sin salir ($ por día)</label>
         <input type="number" id="cfg-corrido" step="1000" inputmode="numeric"></div>
       <div class="acciones"><button class="btn btn-oro" id="btn-guardar-cfg">Guardar ajustes</button></div>
-      <p class="nota">Cambiar una tarifa solo afecta los días que marques de ahora en adelante; los días ya guardados conservan su valor.</p>
+      <p class="nota">Estos ajustes son solo del empleado seleccionado arriba. Cambiar una tarifa solo afecta los días que marques de ahora en adelante; los días ya guardados conservan su valor.</p>
     </div>
     <div class="card">
       <h2>Copia de seguridad</h2>
@@ -207,7 +212,7 @@
         <button class="btn btn-linea" id="btn-importar">Restaurar copia</button>
         <input type="file" id="archivo-importar" accept=".json,application/json" class="oculto">
       </div>
-      <div class="acciones"><button class="btn btn-rojo" id="btn-borrar">Borrar todo</button></div>
+      <div class="acciones"><button class="btn btn-rojo" id="btn-borrar">Borrar historial de este empleado</button></div>
     </div>
   </section>
 </div>
@@ -216,6 +221,7 @@
 <script>
 (() => {
   const CLAVE = 'nomina_castillo_v1';
+  const N_EMPLEADOS = 3;
   const DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
   const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   // Horas de cada jornada (para mostrar)
@@ -232,10 +238,26 @@
     dias: {},      // "YYYY-MM-DD": { tipo, valor }
     semanas: {},   // lunes "YYYY-MM-DD": { pagada, fechaPago, adelanto, nota }
   });
-  let datos;
-  try { datos = JSON.parse(localStorage.getItem(CLAVE)) || porDefecto(); } catch { datos = porDefecto(); }
-  datos.config ??= porDefecto().config; datos.dias ??= {}; datos.semanas ??= {};
-  const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(datos)); } catch { aviso('No se pudo guardar'); } };
+  // Almacén con varios empleados: { version: 2, activo, empleados: [ {config, dias, semanas}, ... ] }
+  // Si viene del formato anterior (un solo empleado), sus datos pasan al Empleado 1.
+  function normalizar(obj) {
+    let st = obj && Array.isArray(obj.empleados) ? obj : { version: 2, activo: 0, empleados: obj && obj.dias ? [obj] : [] };
+    st.version = 2;
+    while (st.empleados.length < N_EMPLEADOS) st.empleados.push(porDefecto());
+    st.empleados = st.empleados.slice(0, N_EMPLEADOS).map(e => {
+      const d = porDefecto();
+      e = e || d; e.config ??= d.config; e.config.tarifas = { ...d.config.tarifas, ...(e.config.tarifas || {}) };
+      e.config.empleado ??= ''; e.dias ??= {}; e.semanas ??= {};
+      return e;
+    });
+    if (!(st.activo >= 0 && st.activo < N_EMPLEADOS)) st.activo = 0;
+    return st;
+  }
+  let almacen;
+  try { almacen = normalizar(JSON.parse(localStorage.getItem(CLAVE))); } catch { almacen = normalizar(null); }
+  let datos = almacen.empleados[almacen.activo];   // empleado seleccionado
+  const nombreEmp = i => almacen.empleados[i].config.empleado || `Empleado ${i + 1}`;
+  const guardar = () => { try { localStorage.setItem(CLAVE, JSON.stringify(almacen)); } catch { aviso('No se pudo guardar'); } };
 
   // ---------- Fechas ----------
   const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -249,25 +271,25 @@
   const pesos = n => '$' + Math.round(n || 0).toLocaleString('es-CO');
 
   // ---------- Cálculos ----------
-  function calcularSemana(lunesIso) {
+  function calcularSemana(lunesIso, emp = datos) {
     const lunes = deIso(lunesIso);
     const r = { conteo: { normal:0, largo:0, corrido:0 }, valor: { normal:0, largo:0, corrido:0 }, horas: 0, bruto: 0, dias: 0 };
     for (let i = 0; i < 7; i++) {
-      const reg = datos.dias[iso(sumarDias(lunes, i))];
+      const reg = emp.dias[iso(sumarDias(lunes, i))];
       if (!reg || !TIPOS[reg.tipo]) continue;
       r.conteo[reg.tipo]++; r.valor[reg.tipo] += reg.valor; r.bruto += reg.valor;
       r.horas += TIPOS[reg.tipo].horas; r.dias++;
     }
-    const s = datos.semanas[lunesIso] || {};
+    const s = emp.semanas[lunesIso] || {};
     r.adelanto = Number(s.adelanto) || 0;
     r.neto = r.bruto - r.adelanto;
     r.pagada = !!s.pagada; r.fechaPago = s.fechaPago; r.nota = s.nota || '';
     return r;
   }
-  function semanasConDatos() {
+  function semanasConDatos(emp = datos) {
     const set = new Set();
-    for (const f of Object.keys(datos.dias)) set.add(iso(lunesDe(deIso(f))));
-    for (const [l, s] of Object.entries(datos.semanas)) if (s.pagada || s.adelanto || s.nota) set.add(l);
+    for (const f of Object.keys(emp.dias)) set.add(iso(lunesDe(deIso(f))));
+    for (const [l, s] of Object.entries(emp.semanas)) if (s.pagada || s.adelanto || s.nota) set.add(l);
     return [...set].sort().reverse();
   }
 
@@ -276,7 +298,9 @@
   let lunesActual = lunesDe(new Date());
 
   document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => mostrarVista(b.dataset.vista)));
+  let vistaActual = 'semana';
   function mostrarVista(v) {
+    vistaActual = v;
     document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('activo', b.dataset.vista === v));
     document.querySelectorAll('.vista').forEach(s => s.classList.toggle('oculto', s.id !== 'vista-' + v));
     if (v === 'semana') pintarSemana();
@@ -309,7 +333,7 @@
     const r = calcularSemana(lunesIso);
     $('resumen-semana').innerHTML =
       ORDEN.map(k => `<div class="fila"><span>${TIPOS[k].nombre} × ${r.conteo[k]}</span><span>${pesos(r.valor[k])}</span></div>`).join('') +
-      `<div class="fila"><span>Días trabajados · horas</span><span>${r.dias} días · ${r.horas.toLocaleString('es-CO')} h</span></div>
+      `<div class="fila"><span>Días trabajados · horas</span><span>${r.dias} ${r.dias===1?'día':'días'} · ${r.horas.toLocaleString('es-CO')} h</span></div>
        <div class="fila"><span>Subtotal</span><span>${pesos(r.bruto)}</span></div>`;
     $('sem-adelanto').value = r.adelanto || '';
     $('sem-nota').value = r.nota;
@@ -360,32 +384,47 @@
   $('mes-sel').value = hoyMes();
   $('mes-sel').addEventListener('change', pintarMes);
 
-  function semanasDelMes(ym) {
+  function semanasDelMes(ym, emp = datos) {
     const [y, m] = ym.split('-').map(Number);
-    return semanasConDatos().filter(l => { const dom = sumarDias(deIso(l), 6); return dom.getFullYear() === y && dom.getMonth()+1 === m; }).sort();
+    return semanasConDatos(emp).filter(l => { const dom = sumarDias(deIso(l), 6); return dom.getFullYear() === y && dom.getMonth()+1 === m; }).sort();
   }
-  function pintarMes() {
-    const ym = $('mes-sel').value || hoyMes();
-    const [y, m] = ym.split('-').map(Number);
-    const semanas = semanasDelMes(ym);
+  function totalesMes(ym, emp = datos) {
     const tot = { conteo: { normal:0, largo:0, corrido:0 }, valor: { normal:0, largo:0, corrido:0 }, dias:0, horas:0, bruto:0, adelanto:0, neto:0, pagado:0 };
-    const filas = semanas.map(l => { const r = calcularSemana(l);
+    const filas = semanasDelMes(ym, emp).map(l => { const r = calcularSemana(l, emp);
       ORDEN.forEach(k => { tot.conteo[k] += r.conteo[k]; tot.valor[k] += r.valor[k]; });
       tot.dias += r.dias; tot.horas += r.horas; tot.bruto += r.bruto; tot.adelanto += r.adelanto; tot.neto += r.neto;
       if (r.pagada) tot.pagado += r.neto;
       return { l, r };
     });
+    return { tot, filas };
+  }
+  function resumenTodos(ym, titulo) {
+    const res = almacen.empleados.map((e, i) => ({ i, ...totalesMes(ym, e).tot }));
+    const g = res.reduce((a, r) => ({ dias: a.dias + r.dias, neto: a.neto + r.neto, pagado: a.pagado + r.pagado }), { dias: 0, neto: 0, pagado: 0 });
+    return `<div class="card">
+      <h2>Los ${N_EMPLEADOS} empleados · ${titulo}</h2>
+      <div class="scroll"><table><thead><tr><th>Empleado</th><th class="num">Días</th><th class="num">Total</th><th class="num">Pendiente</th></tr></thead><tbody>
+      ${res.map(r => `<tr class="click" data-emp="${r.i}"><td>${esc(nombreEmp(r.i))}</td><td class="num">${r.dias}</td><td class="num">${pesos(r.neto)}</td><td class="num">${pesos(r.neto - r.pagado)}</td></tr>`).join('')}
+      <tr><td><b>Total nómina</b></td><td class="num"><b>${g.dias}</b></td><td class="num"><b>${pesos(g.neto)}</b></td><td class="num"><b>${pesos(g.neto - g.pagado)}</b></td></tr>
+      </tbody></table></div>
+      <p class="nota no-imprimir">Toca un empleado para ver su reporte.</p>
+    </div>`;
+  }
+  function pintarMes() {
+    const ym = $('mes-sel').value || hoyMes();
+    const [y, m] = ym.split('-').map(Number);
+    const { tot, filas } = totalesMes(ym);
     const titulo = `${MESES[m-1][0].toUpperCase() + MESES[m-1].slice(1)} ${y}`;
-    const emp = datos.config.empleado || 'Empleado';
-    if (!filas.length) { $('reporte-mes').innerHTML = `<div class="card"><h2>${titulo}</h2><div class="vacio">No hay semanas registradas que terminen en este mes.</div></div>`; return; }
+    const emp = nombreEmp(almacen.activo);
+    if (!filas.length) { $('reporte-mes').innerHTML = `<div class="card"><h2>${esc(emp)} · ${titulo}</h2><div class="vacio">No hay semanas registradas que terminen en este mes.</div></div>` + resumenTodos(ym, titulo); return; }
     $('reporte-mes').innerHTML = `
       <div class="card oro">
         <h2>Reporte mensual · ${titulo}</h2>
         <div class="fila"><span>Empleado</span><span>${esc(emp)}</span></div>
         ${ORDEN.map(k => `<div class="fila"><span>${TIPOS[k].nombre} (${TIPOS[k].horario}) × ${tot.conteo[k]}</span><span>${pesos(tot.valor[k])}</span></div>`).join('')}
-        <div class="fila"><span>Días trabajados · horas</span><span>${tot.dias} días · ${tot.horas.toLocaleString('es-CO')} h</span></div>
+        <div class="fila"><span>Días trabajados · horas</span><span>${tot.dias} ${tot.dias===1?'día':'días'} · ${tot.horas.toLocaleString('es-CO')} h</span></div>
         <div class="fila"><span>Subtotal</span><span>${pesos(tot.bruto)}</span></div>
-        <div class="fila"><span>Adelantos / descuentos</span><span>−${pesos(tot.adelanto)}</span></div>
+        <div class="fila"><span>Adelantos / descuentos</span><span>${tot.adelanto ? '−' + pesos(tot.adelanto) : '$0'}</span></div>
         <div class="fila total"><span>Total del mes</span><span>${pesos(tot.neto)}</span></div>
         <div class="fila"><span>Ya pagado</span><span>${pesos(tot.pagado)}</span></div>
         <div class="fila"><span>Pendiente por pagar</span><span>${pesos(tot.neto - tot.pagado)}</span></div>
@@ -406,48 +445,55 @@
             return reg ? `<tr><td>${DIAS[i].slice(0,3)} ${corta(d)}</td><td>${TIPOS[reg.tipo].nombre} · ${TIPOS[reg.tipo].horario}</td><td class="num">${pesos(reg.valor)}</td></tr>` : ''; })).join('')}
         </tbody></table>
         <p class="solo-imprimir" style="margin-top:40px">Firma del empleado: ______________________________</p>
-      </div>`;
+      </div>` + resumenTodos(ym, titulo);
   }
+  $('reporte-mes').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-emp]'); if (tr) cambiarEmpleado(Number(tr.dataset.emp));
+  });
   $('btn-imprimir').addEventListener('click', () => { pintarMes(); window.print(); });
   $('btn-csv').addEventListener('click', () => {
     const ym = $('mes-sel').value || hoyMes();
-    const filas = [['Fecha','Día','Jornada','Horario','Horas','Valor','Semana','Estado semana']];
+    const nom = nombreEmp(almacen.activo);
+    const filas = [['Empleado','Fecha','Día','Jornada','Horario','Horas','Valor','Semana','Estado semana']];
     for (const l of semanasDelMes(ym)) { const r = calcularSemana(l);
       for (let i = 0; i < 7; i++) { const d = sumarDias(deIso(l), i), reg = datos.dias[iso(d)]; if (!reg) continue;
         const t = TIPOS[reg.tipo];
-        filas.push([iso(d), DIAS[i], t.nombre, t.horario, String(t.horas).replace('.', ','), reg.valor, rangoTxt(deIso(l)), r.pagada ? 'Pagada' : 'Pendiente']); }
-      if (r.adelanto) filas.push(['', '', 'Adelanto/descuento', '', '', -r.adelanto, rangoTxt(deIso(l)), r.pagada ? 'Pagada' : 'Pendiente']);
+        filas.push([nom, iso(d), DIAS[i], t.nombre, t.horario, String(t.horas).replace('.', ','), reg.valor, rangoTxt(deIso(l)), r.pagada ? 'Pagada' : 'Pendiente']); }
+      if (r.adelanto) filas.push([nom, '', '', 'Adelanto/descuento', '', '', -r.adelanto, rangoTxt(deIso(l)), r.pagada ? 'Pagada' : 'Pendiente']);
     }
     const csv = '﻿' + filas.map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
-    descargar(csv, `nomina-${ym}.csv`, 'text/csv;charset=utf-8');
+    descargar(csv, `nomina-${nom.replace(/[^\wáéíóúñÁÉÍÓÚÑ -]/g, '').trim().replace(/\s+/g, '-')}-${ym}.csv`, 'text/csv;charset=utf-8');
   });
 
   // ---------- UI: ajustes ----------
   function pintarAjustes() {
+    $('titulo-ajustes').textContent = `Ajustes de ${nombreEmp(almacen.activo)}`;
     $('cfg-empleado').value = datos.config.empleado || '';
     ORDEN.forEach(k => $('cfg-' + k).value = datos.config.tarifas[k]);
   }
   $('btn-guardar-cfg').addEventListener('click', () => {
     datos.config.empleado = $('cfg-empleado').value.trim();
     for (const k of ORDEN) { const v = Number($('cfg-' + k).value); if (v > 0) datos.config.tarifas[k] = v; }
-    guardar(); pintarEncabezado(); aviso('Ajustes guardados');
+    guardar(); pintarEncabezado(); pintarAjustes(); aviso('Ajustes guardados');
   });
   $('btn-exportar').addEventListener('click', () =>
-    descargar(JSON.stringify(datos, null, 2), `nomina-copia-${iso(new Date())}.json`, 'application/json'));
+    descargar(JSON.stringify(almacen, null, 2), `nomina-copia-${iso(new Date())}.json`, 'application/json'));
   $('btn-importar').addEventListener('click', () => $('archivo-importar').click());
   $('archivo-importar').addEventListener('change', async e => {
     const f = e.target.files[0]; if (!f) return;
     try { const d = JSON.parse(await f.text());
-      if (!d || typeof d.dias !== 'object') throw 0;
-      if (!confirm('¿Reemplazar los datos actuales con esta copia?')) return;
-      datos = { ...porDefecto(), ...d }; guardar(); pintarEncabezado(); pintarAjustes(); aviso('Copia restaurada');
+      if (!d || (typeof d.dias !== 'object' && !Array.isArray(d.empleados))) throw 0;
+      if (!confirm('¿Reemplazar los datos actuales (los 3 empleados) con esta copia?')) return;
+      almacen = normalizar(d); datos = almacen.empleados[almacen.activo]; guardar();
+      pintarEmpleados(); pintarEncabezado(); pintarAjustes(); aviso('Copia restaurada');
     } catch { alert('El archivo no es una copia válida de la nómina.'); }
     e.target.value = '';
   });
   $('btn-borrar').addEventListener('click', () => {
-    if (!confirm('¿Borrar TODO el historial de nómina? Esta acción no se puede deshacer.')) return;
-    if (!confirm('Confirma de nuevo: se borrarán todas las semanas.')) return;
-    const cfg = datos.config; datos = porDefecto(); datos.config = cfg; guardar(); aviso('Historial borrado');
+    const nom = nombreEmp(almacen.activo);
+    if (!confirm(`¿Borrar TODO el historial de ${nom}? Los otros empleados no se tocan. No se puede deshacer.`)) return;
+    if (!confirm(`Confirma de nuevo: se borrarán todas las semanas de ${nom}.`)) return;
+    datos.dias = {}; datos.semanas = {}; guardar(); aviso('Historial borrado');
   });
 
   // ---------- Utilidades ----------
@@ -458,7 +504,18 @@
   }
   let tToast;
   function aviso(txt) { const t = $('toast'); t.textContent = txt; t.classList.add('ver'); clearTimeout(tToast); tToast = setTimeout(() => t.classList.remove('ver'), 1800); }
-  function pintarEncabezado() { $('sub-empleado').textContent = datos.config.empleado ? `Empleado: ${datos.config.empleado}` : 'Autoservicio Castillo'; }
+  function pintarEncabezado() { $('sub-empleado').textContent = `Autoservicio Castillo · ${nombreEmp(almacen.activo)}`; pintarEmpleados(); }
+  function pintarEmpleados() {
+    $('sel-empleados').innerHTML = almacen.empleados.map((_, i) =>
+      `<button data-emp="${i}" class="${i === almacen.activo ? 'activo' : ''}">${esc(nombreEmp(i))}</button>`).join('');
+  }
+  function cambiarEmpleado(i) {
+    almacen.activo = i; datos = almacen.empleados[i]; guardar();
+    pintarEncabezado(); mostrarVista(vistaActual);
+  }
+  $('sel-empleados').addEventListener('click', e => {
+    const b = e.target.closest('button[data-emp]'); if (b) cambiarEmpleado(Number(b.dataset.emp));
+  });
 
   pintarEncabezado();
   pintarSemana();

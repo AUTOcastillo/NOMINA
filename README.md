@@ -1,6 +1,6 @@
 # NOMINA
 
-Nómina semanal del empleado — Autoservicio Castillo.
+Nómina semanal de hasta 3 empleados — Autoservicio Castillo.
 
 Abre `index.html` en el navegador (celular o PC). Para cada día de la semana marca la jornada:
 
@@ -10,8 +10,9 @@ Abre `index.html` en el navegador (celular o PC). Para cada día de la semana ma
 | Hasta 9 pm | 7:30–12:00 y 2:00–9:00 pm | $70.000 |
 | Corrido | 7:30 am–9:00 pm | $80.000 |
 
+- 3 empleados: se elige arriba; cada uno tiene su nombre, tarifas, días e historial por separado.
 - Adelantos/descuentos y estado de pago por semana.
 - Historial de semanas.
-- Reporte mensual (imprimir/PDF o descargar CSV para Excel). Cada semana cuenta en el mes en que termina (domingo).
-- Tarifas editables en Ajustes.
+- Reporte mensual (imprimir/PDF o descargar CSV para Excel). Cada semana cuenta en el mes en que termina (domingo). Incluye un resumen de los 3 empleados con el total de la nómina.
+- Nombre y tarifas de cada empleado editables en Ajustes.
 - Los datos se guardan en el navegador; usa "Descargar copia" en Ajustes para respaldarlos.
