@@ -294,7 +294,7 @@
 
   // ---------- Base de datos en la nube (Hoja de Google + Apps Script) ----------
   // Si quieres que el enlace quede fijo (y solo tengas que escribir la clave), pégalo aquí:
-  const URL_BASE_DATOS = '';
+  const URL_BASE_DATOS = 'https://script.google.com/macros/s/AKfycbw1rpNxLweLWqjv8SSiGSwoqMicY3KDG86b6LN2jyvewLypw1aJPyc6XCXSsKe3zrIH/exec';
   const CLAVE_CONEXION = 'nomina_conexion', CLAVE_PENDIENTES = 'nomina_pendientes';
   const leerLS = (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } };
   const escribirLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
