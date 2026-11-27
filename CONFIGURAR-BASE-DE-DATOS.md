@@ -10,8 +10,14 @@ Se hace **una sola vez** y toma unos 10 minutos.
 
 ## Paso 1 · Crear la hoja y el script (desde un computador)
 
-1. Entra a <https://sheets.google.com> con tu cuenta de Google y crea una hoja
-   en blanco. Ponle de nombre **Nómina Castillo**.
+1. Crea la hoja. Tienes dos opciones:
+   - **Con la plantilla (recomendado):** descarga [`plantilla/Nomina-Castillo.xlsx`](plantilla/Nomina-Castillo.xlsx),
+     súbela a <https://drive.google.com> (Nuevo → Subir archivo), ábrela y elige
+     **Archivo → Guardar como Hojas de cálculo de Google**. Trae las pestañas listas
+     y una pestaña **Resumen** con el total del mes por empleado.
+     Trabaja sobre la copia de Google, no sobre el .xlsx.
+   - **En blanco:** entra a <https://sheets.google.com>, crea una hoja en blanco y
+     ponle de nombre **Nómina Castillo** (el paso 6 crea las pestañas).
 2. En el menú: **Extensiones → Apps Script**. Se abre el editor.
 3. Borra todo lo que aparece y pega el contenido del archivo
    [`google-apps-script/Codigo.gs`](google-apps-script/Codigo.gs) de este repositorio.
